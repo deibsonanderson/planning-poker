@@ -1,16 +1,15 @@
 <?php
+session_start();
 include '../config/database.php';
 
 header('Content-Type: application/json');
 
-$data = json_decode(file_get_contents('php://input'), true);
-
-if (!isset($data['name']) || empty(trim($data['name']))) {
+if (!isset($_POST['name']) || empty(trim($_POST['name']))) {
     echo json_encode(['success' => false, 'error' => 'Nome é obrigatório']);
     exit;
 }
 
-$name = trim($data['name']);
+$name = trim($_POST['name']);
 
 // Verifica se o usuário já existe
 $name_escaped = mysqli_real_escape_string($conexao, $name);

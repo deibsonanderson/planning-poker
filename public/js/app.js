@@ -10,6 +10,37 @@ const state = {
     myVote: null
 };
 
+// --- AJAX Helpers ---
+function ajaxPost(url, dataObj) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200 || xhr.status === 201) {
+                    try {
+                        resolve(JSON.parse(xhr.responseText));
+                    } catch (e) {
+                        resolve(xhr.responseText);
+                    }
+                } else {
+                    reject(new Error('Erro na requisição: ' + xhr.status));
+                }
+            }
+        };
+
+        const formData = new FormData();
+        if (dataObj) {
+            for (const key in dataObj) {
+                formData.append(key, dataObj[key]);
+            }
+        }
+
+        xhr.send(formData);
+    });
+}
+
 // --- DOM Elements ---
 const viewLogin = document.getElementById('view-login');
 const viewRoom = document.getElementById('view-room');
@@ -35,12 +66,7 @@ function init() {
 // --- Autenticação ---
 async function login(name) {
     try {
-        const res = await fetch('../api/login.php', {
-            method: 'POST',
-            body: JSON.stringify({ name }),
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await res.json();
+        const data = await ajaxPost('../api/login.php', { name });
 
         if (data.success) {
             state.userId = data.user_id;
@@ -62,34 +88,42 @@ async function login(name) {
     }
 }
 
-let roomsPollAbortController = null;
+let roomsPollXhr = null;
 let lastRoomsHash = '';
 
 function pollRooms() {
     if (state.roomId || !state.userId) return;
 
-    roomsPollAbortController = new AbortController();
-    fetch(`../api/poll_rooms.php?last_hash=${lastRoomsHash}`, { signal: roomsPollAbortController.signal })
-        .then(res => res.json())
-        .then(data => {
-            if (data.changed) {
-                lastRoomsHash = data.hash;
-                renderRoomsList(data.rooms);
+    roomsPollXhr = new XMLHttpRequest();
+    roomsPollXhr.open('GET', `../api/poll_rooms.php?last_hash=${lastRoomsHash}`, true);
+    roomsPollXhr.onreadystatechange = function () {
+        if (roomsPollXhr.readyState === 4) {
+            if (roomsPollXhr.status === 200) {
+                try {
+                    const data = JSON.parse(roomsPollXhr.responseText);
+                    if (data.changed) {
+                        lastRoomsHash = data.hash;
+                        renderRoomsList(data.rooms);
+                    }
+                    if (!state.roomId && state.userId) {
+                        pollRooms();
+                    }
+                } catch (err) {
+                    console.error("Rooms poll parse error:", err);
+                    if (!state.roomId && state.userId) setTimeout(pollRooms, 2000);
+                }
+            } else if (roomsPollXhr.status !== 0) {
+                console.error("Rooms poll error, status:", roomsPollXhr.status);
+                if (!state.roomId && state.userId) setTimeout(pollRooms, 2000);
             }
-            if (!state.roomId && state.userId) {
-                pollRooms();
-            }
-        })
-        .catch(err => {
-            if (err.name === 'AbortError') return;
-            console.error("Rooms poll error:", err);
-            if (!state.roomId && state.userId) setTimeout(pollRooms, 2000);
-        });
+        }
+    };
+    roomsPollXhr.send();
 }
 
 function loadRooms() {
     lastRoomsHash = '';
-    if (roomsPollAbortController) roomsPollAbortController.abort();
+    if (roomsPollXhr) roomsPollXhr.abort();
     pollRooms();
 }
 
@@ -165,10 +199,7 @@ function renderRoomsList(rooms) {
             btnResetParts.onclick = async (e) => {
                 e.stopPropagation();
                 if (confirm('Tem certeza que deseja remover todos os participantes desta sala?')) {
-                    await fetch('../api/reset_participants.php', {
-                        method: 'POST',
-                        body: JSON.stringify({ room_id: room.id })
-                    });
+                    await ajaxPost('../api/reset_participants.php', { room_id: room.id });
                     loadRooms();
                 }
             };
@@ -185,10 +216,7 @@ function renderRoomsList(rooms) {
             btnDelete.onclick = async (e) => {
                 e.stopPropagation();
                 if (confirm('Tem certeza que deseja excluir esta sala permanentemente?')) {
-                    await fetch('../api/delete_room.php', {
-                        method: 'POST',
-                        body: JSON.stringify({ room_id: room.id })
-                    });
+                    await ajaxPost('../api/delete_room.php', { room_id: room.id });
                     loadRooms();
                 }
             };
@@ -216,11 +244,7 @@ async function createRoom() {
             roomName = `Sala de ${state.userName}`;
         }
 
-        const res = await fetch('../api/create_room.php', {
-            method: 'POST',
-            body: JSON.stringify({ name: roomName })
-        });
-        const data = await res.json();
+        const data = await ajaxPost('../api/create_room.php', { name: roomName });
 
         if (data.success) {
             joinRoom(data.room_id);
@@ -232,11 +256,7 @@ async function createRoom() {
 
 async function joinRoom(roomId) {
     try {
-        const res = await fetch('../api/join_room.php', {
-            method: 'POST',
-            body: JSON.stringify({ room_id: roomId })
-        });
-        const data = await res.json();
+        const data = await ajaxPost('../api/join_room.php', { room_id: roomId });
 
         if (data.success) {
             state.roomId = roomId;
@@ -246,7 +266,7 @@ async function joinRoom(roomId) {
             // Registra a si mesmo localmente na interface
             state.players[state.userId] = { name: state.userName, voted: false, value: null };
 
-            if (roomsPollAbortController) roomsPollAbortController.abort();
+            //if (roomsPollAbortController) roomsPollAbortController.abort();
             showRoom();
             poll(); // Inicia o long polling
         }
@@ -411,10 +431,7 @@ async function castVote(value) {
     renderDeck();
 
     try {
-        await fetch('../api/vote.php', {
-            method: 'POST',
-            body: JSON.stringify({ room_id: state.roomId, value })
-        });
+        await ajaxPost('../api/vote.php', { room_id: state.roomId, value });
     } catch (e) {
         console.error(e);
     }
@@ -422,10 +439,7 @@ async function castVote(value) {
 
 async function revealVotes() {
     try {
-        await fetch('../api/reveal.php', {
-            method: 'POST',
-            body: JSON.stringify({ room_id: state.roomId })
-        });
+        await ajaxPost('../api/reveal.php', { room_id: state.roomId });
     } catch (e) {
         console.error(e);
     }
@@ -433,37 +447,47 @@ async function revealVotes() {
 
 async function resetRoom() {
     try {
-        await fetch('../api/reset.php', {
-            method: 'POST',
-            body: JSON.stringify({ room_id: state.roomId })
-        });
+        await ajaxPost('../api/reset.php', { room_id: state.roomId });
     } catch (e) {
         console.error(e);
     }
 }
 
 // --- Long Polling ---
-let pollAbortController = null;
+let pollXhr = null;
 function poll() {
     if (!state.roomId) return;
-    pollAbortController = new AbortController();
-    fetch(`../api/poll.php?room_id=${state.roomId}&last_event_id=${state.lastEventId}`, { signal: pollAbortController.signal })
-        .then(res => res.json())
-        .then(events => {
-            if (events.length > 0) {
-                const isCatchingUp = (state.lastEventId === 0);
-                events.forEach(event => {
-                    state.lastEventId = parseInt(event.id);
-                    handleEvent(event, isCatchingUp);
-                });
+
+    if (pollXhr) {
+        pollXhr.abort();
+    }
+
+    pollXhr = new XMLHttpRequest();
+    pollXhr.open('GET', `../api/poll.php?room_id=${state.roomId}&last_event_id=${state.lastEventId}`, true);
+    pollXhr.onreadystatechange = function () {
+        if (pollXhr.readyState === 4) {
+            if (pollXhr.status === 200) {
+                try {
+                    const events = JSON.parse(pollXhr.responseText);
+                    if (events.length > 0) {
+                        const isCatchingUp = (state.lastEventId === 0);
+                        events.forEach(event => {
+                            state.lastEventId = parseInt(event.id);
+                            handleEvent(event, isCatchingUp);
+                        });
+                    }
+                    if (state.roomId) poll();
+                } catch (err) {
+                    console.error("Poll parse error:", err);
+                    if (state.roomId) setTimeout(poll, 2000);
+                }
+            } else if (pollXhr.status !== 0) {
+                console.error("Poll error, status:", pollXhr.status);
+                if (state.roomId) setTimeout(poll, 2000);
             }
-            if (state.roomId) poll(); // Recursivo apenas se ainda estiver na sala
-        })
-        .catch(err => {
-            if (err.name === 'AbortError') return;
-            console.error("Poll error:", err);
-            if (state.roomId) setTimeout(poll, 2000); // Retry após erro
-        });
+        }
+    };
+    pollXhr.send();
 }
 
 function handleEvent(event, isCatchingUp = false) {
@@ -528,8 +552,8 @@ function handleEvent(event, isCatchingUp = false) {
 }
 
 function leaveRoom() {
-    if (pollAbortController) {
-        pollAbortController.abort();
+    if (pollXhr) {
+        pollXhr.abort();
     }
     state.roomId = null;
     state.roomName = null;

@@ -8,14 +8,14 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
-
-if (!isset($data['room_id'])) {
+if (!isset($_POST['room_id']) && !isset($_GET['room_id'])) {
     echo json_encode(['success' => false, 'error' => 'ID da sala é obrigatório']);
     exit;
+}else{
+   $_aux = isset($_POST['room_id'])?$_POST['room_id']:$_GET['room_id'];
 }
 
-$room_id = intval($data['room_id']);
+$room_id = intval($_aux);
 $user_id = $_SESSION['user_id'];
 $user_name = $_SESSION['user_name'];
 

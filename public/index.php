@@ -1,7 +1,7 @@
 <?php
+session_start();
 // Start session for potential direct checks if needed, 
 // though the JS handles the API calls.
-session_start();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">

@@ -8,14 +8,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
-
-if (!isset($data['room_id'])) {
+if (!isset($_POST['room_id'])) {
     echo json_encode(['success' => false, 'error' => 'ID da sala é obrigatório']);
     exit;
 }
 
-$room_id = intval($data['room_id']);
+$room_id = intval($_POST['room_id']);
 
 // Emitir evento final caso haja clientes conectados
 $type = 'participants_reset'; // Reaproveitamos o mesmo evento de reset para jogar todos para o lobby

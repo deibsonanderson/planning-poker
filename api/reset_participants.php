@@ -8,14 +8,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
-
-if (!isset($data['room_id'])) {
+if (!isset($_POST['room_id'])) {
     echo json_encode(['success' => false, 'error' => 'ID da sala é obrigatório']);
     exit;
 }
 
-$room_id = intval($data['room_id']);
+$room_id = intval($_POST['room_id']);
 
 mysqli_query($conexao, "DELETE FROM tb_poker_room_users WHERE room_id = $room_id");
 mysqli_query($conexao, "DELETE FROM tb_poker_votes WHERE room_id = $room_id");

@@ -8,16 +8,14 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
-
-if (!isset($data['room_id']) || !isset($data['value'])) {
+if (!isset($_POST['room_id']) || !isset($_POST['value'])) {
     echo json_encode(['success' => false, 'error' => 'Dados incompletos']);
     exit;
 }
 
-$room_id = intval($data['room_id']);
+$room_id = intval($_POST['room_id']);
 $user_id = $_SESSION['user_id'];
-$value = mysqli_real_escape_string($conexao, $data['value']);
+$value = mysqli_real_escape_string($conexao, $_POST['value']);
 
 // Remove voto anterior (se existir na rodada)
 mysqli_query($conexao, "DELETE FROM tb_poker_votes WHERE room_id = $room_id AND user_id = $user_id");

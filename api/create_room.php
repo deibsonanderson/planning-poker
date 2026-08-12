@@ -1,15 +1,15 @@
 <?php
+session_start();
 include '../config/database.php';
 
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'error' => 'Não autenticado']);
+    echo json_encode(['success' => false, 'error' => 'Não autenticado:['.$_SESSION['user_id'].']']);
     exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
-$room_name = isset($data['name']) ? trim($data['name']) : 'Sala de ' . $_SESSION['user_name'];
+$room_name = isset($_POST['name']) ? trim($_POST['name']) : 'Sala de ' . $_SESSION['user_name'];
 $room_name = mysqli_real_escape_string($conexao, $room_name);
 $user_id = (int) $_SESSION['user_id']; // Forçando cast para int para segurança
 
