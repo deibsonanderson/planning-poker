@@ -39,6 +39,7 @@ Gerencia os usuários/jogadores do sistema.
 Gerencia as salas (mesas) de votação.
 *   `id` (INT, PK, Auto Increment)
 *   `name` (VARCHAR): Nome ou título da sala.
+*   `code` (VARCHAR(20), UNIQUE): Identificador único de 20 caracteres (ano+mes+dia+hora+minuto+segundo+milisegundo+3 aleatórios) para compartilhamento e exibição.
 *   `created_by` (INT): ID do usuário criador (Host).
 *   `status` (ENUM): Estado atual da sala (`'voting'`, `'revealed'`).
 *   `created_at` (TIMESTAMP)

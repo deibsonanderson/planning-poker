@@ -13,7 +13,14 @@ if (!isset($_POST['room_id']) || !isset($_POST['value'])) {
     exit;
 }
 
-$room_id = intval($_POST['room_id']);
+$raw_room = trim($_POST['room_id']);
+if (is_numeric($raw_room) && strlen($raw_room) < 10) {
+    $room_id = intval($raw_room);
+} else {
+    $raw_room_esc = mysqli_real_escape_string($conexao, $raw_room);
+    $r = mysqli_query($conexao, "SELECT id FROM tb_poker_rooms WHERE code = '$raw_room_esc' OR id = '$raw_room_esc'");
+    $room_id = ($row = mysqli_fetch_assoc($r)) ? intval($row['id']) : intval($raw_room);
+}
 $user_id = $_SESSION['user_id'];
 $value = mysqli_real_escape_string($conexao, $_POST['value']);
 

@@ -12,7 +12,7 @@ $start = time();
 while (true) {
     if (connection_aborted()) break;
 
-    $sql = "SELECT id, name, status, created_at FROM tb_poker_rooms ORDER BY created_at DESC LIMIT 50";
+    $sql = "SELECT id, name, code, status, created_at FROM tb_poker_rooms ORDER BY created_at DESC LIMIT 5";
     $result = mysqli_query($conexao, $sql);
     
     $rooms = [];
@@ -20,7 +20,8 @@ while (true) {
     if ($result) {
         while ($row = mysqli_fetch_assoc($result)) {
             $rooms[] = $row;
-            $rooms_data .= $row['id'] . $row['name'] . $row['status'] . $row['created_at'];
+            $code_val = isset($row['code']) ? $row['code'] : '';
+            $rooms_data .= $row['id'] . $row['name'] . $code_val . $row['status'] . $row['created_at'];
         }
     }
     

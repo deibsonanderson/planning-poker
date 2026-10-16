@@ -3,6 +3,7 @@ const state = {
     userId: null,
     userName: null,
     roomId: null,
+    roomCode: null,
     roomName: null,
     lastEventId: 0,
     players: {},
@@ -58,7 +59,8 @@ function init() {
     const paramRoomId = urlParams.get('room_id');
 
     if (paramRoomId) {
-        state.roomId = parseInt(paramRoomId);
+        state.roomId = paramRoomId.trim();
+        state.roomCode = paramRoomId.trim();
         document.getElementById('welcome-msg').textContent = 'Você foi convidado para uma sala!';
     }
 }
@@ -139,7 +141,7 @@ function renderRoomsList(rooms) {
             return;
         }
 
-        rooms.forEach(room => {
+        rooms.slice(0, 5).forEach(room => {
             const item = document.createElement('div');
             item.style.display = 'flex';
             item.style.flexDirection = 'column';
@@ -154,9 +156,10 @@ function renderRoomsList(rooms) {
             header.style.alignItems = 'center';
 
             let statusText = room.status === 'voting' ? 'Votando' : 'Revelado';
+            const roomCode = room.code || room.id;
             header.innerHTML = `
                     <span style="font-weight: 600; color: var(--text-primary);">${room.name}</span>
-                    <span style="font-size: 0.8rem; opacity: 0.8;">#${room.id} - ${statusText}</span>
+                    <span style="font-size: 0.8rem; opacity: 0.8;">#${roomCode} - ${statusText}</span>
                 `;
 
             const actions = document.createElement('div');
@@ -170,7 +173,7 @@ function renderRoomsList(rooms) {
             btnJoin.style.flex = '1';
             btnJoin.style.padding = '0.5rem';
             btnJoin.style.fontSize = '0.85rem';
-            btnJoin.onclick = () => joinRoom(room.id);
+            btnJoin.onclick = () => joinRoom(roomCode);
 
             const btnCopy = document.createElement('button');
             btnCopy.className = 'secondary';
@@ -180,7 +183,7 @@ function renderRoomsList(rooms) {
             btnCopy.style.fontSize = '0.85rem';
             btnCopy.onclick = (e) => {
                 e.stopPropagation();
-                const link = window.location.origin + window.location.pathname + '?room_id=' + room.id;
+                const link = window.location.origin + window.location.pathname + '?room_id=' + roomCode;
                 navigator.clipboard.writeText(link).then(() => {
                     btnCopy.textContent = 'Copiado!';
                     setTimeout(() => btnCopy.textContent = 'Copiar Link', 2000);
@@ -199,7 +202,7 @@ function renderRoomsList(rooms) {
             btnResetParts.onclick = async (e) => {
                 e.stopPropagation();
                 if (confirm('Tem certeza que deseja remover todos os participantes desta sala?')) {
-                    await ajaxPost('../api/reset_participants.php', { room_id: room.id });
+                    await ajaxPost('../api/reset_participants.php', { room_id: roomCode });
                     loadRooms();
                 }
             };
@@ -216,7 +219,7 @@ function renderRoomsList(rooms) {
             btnDelete.onclick = async (e) => {
                 e.stopPropagation();
                 if (confirm('Tem certeza que deseja excluir esta sala permanentemente?')) {
-                    await ajaxPost('../api/delete_room.php', { room_id: room.id });
+                    await ajaxPost('../api/delete_room.php', { room_id: roomCode });
                     loadRooms();
                 }
             };
@@ -247,21 +250,22 @@ async function createRoom() {
         const data = await ajaxPost('../api/create_room.php', { name: roomName });
 
         if (data.success) {
-            joinRoom(data.room_id);
+            joinRoom(data.code || data.room_id);
         }
     } catch (e) {
         console.error(e);
     }
 }
 
-async function joinRoom(roomId) {
+async function joinRoom(roomIdent) {
     try {
-        const data = await ajaxPost('../api/join_room.php', { room_id: roomId });
+        const data = await ajaxPost('../api/join_room.php', { room_id: roomIdent });
 
         if (data.success) {
-            state.roomId = roomId;
+            state.roomId = data.room_id;
+            state.roomCode = data.room_code || roomIdent;
             state.roomName = data.room_name;
-            window.history.pushState({}, '', `?room_id=${roomId}`);
+            window.history.pushState({}, '', `?room_id=${state.roomCode}`);
 
             // Registra a si mesmo localmente na interface
             state.players[state.userId] = { name: state.userName, voted: false, value: null };
@@ -269,6 +273,8 @@ async function joinRoom(roomId) {
             //if (roomsPollAbortController) roomsPollAbortController.abort();
             showRoom();
             poll(); // Inicia o long polling
+        } else {
+            alert(data.error || 'Erro ao entrar na sala');
         }
     } catch (e) {
         console.error(e);
@@ -303,7 +309,8 @@ function updateButtons() {
 function showRoom() {
     viewLogin.classList.add('hidden');
     viewRoom.classList.remove('hidden');
-    roomTitle.textContent = state.roomName ? state.roomName : `Sala #${state.roomId}`;
+    const displayCode = state.roomCode || state.roomId;
+    roomTitle.textContent = state.roomName ? state.roomName : `Sala #${displayCode}`;
     renderPlayers();
     renderDeck();
 }
@@ -556,6 +563,7 @@ function leaveRoom() {
         pollXhr.abort();
     }
     state.roomId = null;
+    state.roomCode = null;
     state.roomName = null;
     state.lastEventId = 0;
     state.players = {};

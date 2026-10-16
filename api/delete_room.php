@@ -13,7 +13,14 @@ if (!isset($_POST['room_id'])) {
     exit;
 }
 
-$room_id = intval($_POST['room_id']);
+$room_param = mysqli_real_escape_string($conexao, trim($_POST['room_id']));
+$res = mysqli_query($conexao, "SELECT id FROM tb_poker_rooms WHERE code = '$room_param' OR id = '$room_param'");
+if (!$res || mysqli_num_rows($res) === 0) {
+    echo json_encode(['success' => false, 'error' => 'Sala não encontrada']);
+    exit;
+}
+$room = mysqli_fetch_assoc($res);
+$room_id = (int)$room['id'];
 
 // Emitir evento final caso haja clientes conectados
 $type = 'participants_reset'; // Reaproveitamos o mesmo evento de reset para jogar todos para o lobby

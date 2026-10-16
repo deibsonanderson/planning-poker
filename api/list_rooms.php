@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$sql = "SELECT id, name, status, created_at FROM tb_poker_rooms ORDER BY created_at DESC LIMIT 50";
+$sql = "SELECT id, name, code, status, created_at FROM tb_poker_rooms ORDER BY created_at DESC LIMIT 5";
 $result = mysqli_query($conexao, $sql);
 $rooms = [];
 if ($result) {

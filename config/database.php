@@ -2,6 +2,7 @@
 // Omitir mensagens de Deprecated, Warnings e Notices que quebram o JSON (especialmente do PHP 5.6)
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT & ~E_WARNING & ~E_NOTICE);
 ini_set('display_errors', 0);
+date_default_timezone_set('America/Sao_Paulo');
 
 $host = 'localhost';
 $user = 'root';

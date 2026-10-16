@@ -9,7 +9,14 @@ if (!isset($_GET['room_id']) || !isset($_GET['last_event_id'])) {
     exit;
 }
 
-$room_id = intval($_GET['room_id']);
+$raw_room = trim($_GET['room_id']);
+if (is_numeric($raw_room) && strlen($raw_room) < 10) {
+    $room_id = intval($raw_room);
+} else {
+    $raw_room_esc = mysqli_real_escape_string($conexao, $raw_room);
+    $r = mysqli_query($conexao, "SELECT id FROM tb_poker_rooms WHERE code = '$raw_room_esc' OR id = '$raw_room_esc'");
+    $room_id = ($row = mysqli_fetch_assoc($r)) ? intval($row['id']) : intval($raw_room);
+}
 $last_event_id = intval($_GET['last_event_id']);
 
 $timeout = 20; // Segura a requisição por até 20 segundos

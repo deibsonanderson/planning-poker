@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS tb_poker_users (
 CREATE TABLE IF NOT EXISTS tb_poker_rooms (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100),
+    code VARCHAR(20) UNIQUE,
     created_by INT,
     status ENUM('voting','revealed') DEFAULT 'voting',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
