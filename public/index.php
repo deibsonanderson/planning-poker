@@ -68,7 +68,7 @@ session_start();
         <div class="poker-table-wrapper animated">
             <div class="poker-table">
                 <!-- Centro da mesa -->
-                <div style="opacity: 0.1; font-weight: bold; font-size: 2rem;">POKER</div>
+                <div id="table-room-name" class="table-room-name"></div>
             </div>
             
             <div id="players-container" class="players-container">

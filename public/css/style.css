@@ -44,7 +44,9 @@ body {
 }
 
 /* Typography */
-h1, h2, h3 {
+h1,
+h2,
+h3 {
     font-weight: 700;
     letter-spacing: -0.025em;
     margin-bottom: 1rem;
@@ -145,25 +147,43 @@ button.secondary:hover {
 .poker-table-wrapper {
     position: relative;
     width: 100%;
-    max-width: 800px;
-    margin: 4rem auto;
+    max-width: 850px;
+    min-height: 440px;
+    margin: 3rem auto 2rem auto;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
 }
 
 .poker-table {
-    width: 300px;
-    height: 150px;
-    background: rgba(30, 41, 59, 0.5);
+    width: 500px;
+    height: 200px;
+    background: rgba(30, 41, 59, 0.6);
     border: 2px solid var(--primary-color);
     border-radius: 100px;
     position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 0 40px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.15), inset 0 0 25px rgba(0, 0, 0, 0.4);
+}
+
+.table-room-name {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    opacity: 0.25;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-align: center;
+    max-width: 420px;
+    padding: 0 1.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: none;
+    pointer-events: none;
 }
 
 .table-controls {
@@ -172,22 +192,41 @@ button.secondary:hover {
 }
 
 .players-container {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 2rem;
-    width: 100%;
     position: absolute;
-    top: -60px;
-    bottom: -60px;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
+    z-index: 2;
 }
 
 .player-spot {
+    position: absolute;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    z-index: 3;
+    transition: left 0.4s ease, top 0.4s ease;
+}
+
+.player-spot.animated {
+    animation: popInSpot 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes popInSpot {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
 }
 
 .player-card {
@@ -199,15 +238,18 @@ button.secondary:hover {
     display: flex;
     align-items: center;
     justify-content: center;
+    text-align: center;
+    line-height: 1;
     font-weight: bold;
     font-size: 1.25rem;
     position: relative;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .player-card.voted {
     background: linear-gradient(135deg, var(--primary-color) 0%, #1e40af 100%);
-    color: transparent;
+    color: #ffffff;
 }
 
 .player-card.revealed {
@@ -219,12 +261,31 @@ button.secondary:hover {
 .player-name {
     font-size: 0.875rem;
     color: var(--text-secondary);
+    white-space: nowrap;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+/* Responsive Table */
+@media (max-width: 768px) {
+    .poker-table-wrapper {
+        min-height: 380px;
+        transform: scale(0.85);
+        transform-origin: center center;
+    }
+}
+
+@media (max-width: 540px) {
+    .poker-table-wrapper {
+        min-height: 320px;
+        transform: scale(0.68);
+        transform-origin: center center;
+    }
 }
 
 /* Voting Deck */
 .deck-container {
-    margin-top: 5rem;
-    padding: 2rem;
+    margin-top: 1rem;
+    padding: 1rem;
     text-align: center;
 }
 
@@ -239,13 +300,21 @@ button.secondary:hover {
 .vote-btn {
     width: 60px;
     height: 85px;
+    padding: 0;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1;
     background: var(--surface-color);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     font-weight: 700;
     color: var(--text-primary);
     cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
     transition: all 0.2s ease;
 }
 
@@ -263,8 +332,15 @@ button.secondary:hover {
 
 /* Animations */
 @keyframes popIn {
-    0% { transform: scale(0.8); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .animated {

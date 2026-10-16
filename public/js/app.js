@@ -48,6 +48,7 @@ const viewRoom = document.getElementById('view-room');
 const loginForm = document.getElementById('login-form');
 const dashboardView = document.getElementById('dashboard-view');
 const roomTitle = document.getElementById('room-title');
+const tableRoomName = document.getElementById('table-room-name');
 const playersContainer = document.getElementById('players-container');
 const deckContainer = document.getElementById('deck');
 const btnReveal = document.getElementById('btn-reveal');
@@ -141,7 +142,7 @@ function renderRoomsList(rooms) {
             return;
         }
 
-        rooms.slice(0, 5).forEach(room => {
+        rooms.slice(0, 3).forEach(room => {
             const item = document.createElement('div');
             item.style.display = 'flex';
             item.style.flexDirection = 'column';
@@ -310,19 +311,93 @@ function showRoom() {
     viewLogin.classList.add('hidden');
     viewRoom.classList.remove('hidden');
     const displayCode = state.roomCode || state.roomId;
-    roomTitle.textContent = state.roomName ? state.roomName : `Sala #${displayCode}`;
+    const nameText = state.roomName ? state.roomName : `Sala #${displayCode}`;
+    roomTitle.textContent = nameText;
+    if (tableRoomName) {
+        tableRoomName.textContent = nameText;
+    }
     renderPlayers();
     renderDeck();
+}
+
+function getTablePosition(index, total) {
+    // Table dimensions: width 500, height 200, border-radius 100
+    // Straight middle section: from x = -150 to x = 150 (length 300)
+    // Semicircles at ends: radius 100, centered at (-150, 0) and (150, 0)
+    const offset = 65; // px outside the table edge
+    const r = 100 + offset; // 165px
+    const straightL = 300; // length of straight top / bottom segment
+    const arcL = Math.PI * r; // length of semicircle arc (~518.36px)
+    const totalPerimeter = (straightL * 2) + (arcL * 2); // ~1636.72px
+
+    const step = totalPerimeter / total;
+    const s = (index * step);
+
+    const s1 = straightL / 2; // 150
+    const s2 = s1 + arcL;      // 150 + arcL
+    const s3 = s2 + straightL; // 450 + arcL
+    const s4 = s3 + arcL;      // 450 + 2*arcL
+
+    let x = 0;
+    let y = r;
+
+    if (s <= s1) {
+        // Bottom straight line (right half)
+        x = s;
+        y = r;
+    } else if (s <= s2) {
+        // Right semicircular arc: from +PI/2 down to -PI/2
+        const progress = (s - s1) / arcL;
+        const angle = (Math.PI / 2) - (progress * Math.PI);
+        x = 150 + (r * Math.cos(angle));
+        y = r * Math.sin(angle);
+    } else if (s <= s3) {
+        // Top straight line: from +150 down to -150
+        const dist = s - s2;
+        x = 150 - dist;
+        y = -r;
+    } else if (s <= s4) {
+        // Left semicircular arc: from -PI/2 down to -3PI/2
+        const progress = (s - s3) / arcL;
+        const angle = (-Math.PI / 2) - (progress * Math.PI);
+        x = -150 + (r * Math.cos(angle));
+        y = r * Math.sin(angle);
+    } else {
+        // Bottom straight line (left half): from -150 to 0
+        const dist = s - s4;
+        x = -150 + dist;
+        y = r;
+    }
+
+    return { x: Math.round(x), y: Math.round(y) };
 }
 
 function renderPlayers() {
     playersContainer.innerHTML = '';
 
-    Object.keys(state.players).forEach(uid => {
+    const uids = Object.keys(state.players);
+    const total = uids.length;
+    if (total === 0) {
+        updateButtons();
+        return;
+    }
+
+    // Current user stays at index 0 (bottom center), others follow clockwise
+    const myIdStr = String(state.userId);
+    const myIdx = uids.indexOf(myIdStr);
+    let orderedUids = uids;
+    if (myIdx > -1) {
+        orderedUids = [...uids.slice(myIdx), ...uids.slice(0, myIdx)];
+    }
+
+    orderedUids.forEach((uid, index) => {
         const p = state.players[uid];
+        const pos = getTablePosition(index, total);
 
         const spot = document.createElement('div');
         spot.className = 'player-spot animated';
+        spot.style.left = `calc(50% + ${pos.x}px)`;
+        spot.style.top = `calc(50% + ${pos.y}px)`;
 
         const card = document.createElement('div');
         card.className = `player-card ${p.voted ? 'voted' : ''} ${state.roomStatus === 'revealed' ? 'revealed' : ''}`;

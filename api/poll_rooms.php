@@ -12,7 +12,7 @@ $start = time();
 while (true) {
     if (connection_aborted()) break;
 
-    $sql = "SELECT id, name, code, status, created_at FROM tb_poker_rooms ORDER BY created_at DESC LIMIT 5";
+    $sql = "SELECT id, name, code, status, created_at FROM tb_poker_rooms ORDER BY created_at DESC LIMIT 3";
     $result = mysqli_query($conexao, $sql);
     
     $rooms = [];
