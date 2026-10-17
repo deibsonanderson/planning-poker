@@ -268,8 +268,26 @@ async function joinRoom(roomIdent) {
             state.roomName = data.room_name;
             window.history.pushState({}, '', `?room_id=${state.roomCode}`);
 
-            // Registra a si mesmo localmente na interface
-            state.players[state.userId] = { name: state.userName, voted: false, value: null };
+            if (data.status) {
+                state.roomStatus = data.status;
+            }
+
+            if (data.players && Array.isArray(data.players) && data.players.length > 0) {
+                state.players = {};
+                data.players.forEach(p => {
+                    state.players[p.id] = {
+                        name: p.name,
+                        voted: p.voted,
+                        value: p.value || null
+                    };
+                });
+                if (state.players[state.userId] && state.players[state.userId].value) {
+                    state.myVote = state.players[state.userId].value;
+                }
+            } else {
+                // Registra a si mesmo localmente na interface
+                state.players[state.userId] = { name: state.userName, voted: false, value: null };
+            }
 
             //if (roomsPollAbortController) roomsPollAbortController.abort();
             showRoom();
@@ -382,6 +400,30 @@ function renderPlayers() {
         return;
     }
 
+    // Identifica o valor vencedor se a sala estiver revelada e não houver empate
+    let winningValue = null;
+    if (state.roomStatus === 'revealed') {
+        const voteCounts = {};
+        Object.values(state.players).forEach(p => {
+            if (p.value !== null && p.value !== undefined) {
+                voteCounts[p.value] = (voteCounts[p.value] || 0) + 1;
+            }
+        });
+
+        let maxVotes = 0;
+        Object.values(voteCounts).forEach(count => {
+            if (count > maxVotes) maxVotes = count;
+        });
+
+        if (maxVotes > 0) {
+            const topValues = Object.keys(voteCounts).filter(val => voteCounts[val] === maxVotes);
+            // Apenas marca dourado se não houver empate
+            if (topValues.length === 1) {
+                winningValue = topValues[0];
+            }
+        }
+    }
+
     // Current user stays at index 0 (bottom center), others follow clockwise
     const myIdStr = String(state.userId);
     const myIdx = uids.indexOf(myIdStr);
@@ -399,8 +441,9 @@ function renderPlayers() {
         spot.style.left = `calc(50% + ${pos.x}px)`;
         spot.style.top = `calc(50% + ${pos.y}px)`;
 
+        const isWinner = (state.roomStatus === 'revealed' && winningValue !== null && p.value === winningValue);
         const card = document.createElement('div');
-        card.className = `player-card ${p.voted ? 'voted' : ''} ${state.roomStatus === 'revealed' ? 'revealed' : ''}`;
+        card.className = `player-card ${p.voted ? 'voted' : ''} ${state.roomStatus === 'revealed' ? 'revealed' : ''} ${isWinner ? 'winner' : ''}`;
 
         if (state.roomStatus === 'revealed' && p.value) {
             card.textContent = p.value;
