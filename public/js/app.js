@@ -62,7 +62,22 @@ function init() {
     if (paramRoomId) {
         state.roomId = paramRoomId.trim();
         state.roomCode = paramRoomId.trim();
-        document.getElementById('welcome-msg').textContent = 'Você foi convidado para uma sala!';
+        const welcomeEl = document.getElementById('welcome-msg');
+        if (welcomeEl) welcomeEl.textContent = 'Você foi convidado para uma sala!';
+    }
+
+    if (window.INITIAL_SESSION && window.INITIAL_SESSION.user_id) {
+        state.userId = window.INITIAL_SESSION.user_id;
+        state.userName = window.INITIAL_SESSION.name;
+
+        if (loginForm) loginForm.classList.add('hidden');
+
+        if (state.roomId) {
+            joinRoom(state.roomId);
+        } else {
+            if (dashboardView) dashboardView.classList.remove('hidden');
+            loadRooms();
+        }
     }
 }
 
@@ -243,15 +258,20 @@ function renderRoomsList(rooms) {
 async function createRoom() {
     try {
         const roomNameInput = document.getElementById('input-room-name');
-        let roomName = roomNameInput ? roomNameInput.value.trim() : '';
+        const roomName = roomNameInput ? roomNameInput.value.trim() : '';
         if (!roomName) {
-            roomName = `Sala de ${state.userName}`;
+            alert('Por favor, preencha o nome da sala.');
+            if (roomNameInput) roomNameInput.focus();
+            return;
         }
 
         const data = await ajaxPost('../api/create_room.php', { name: roomName });
 
         if (data.success) {
+            if (roomNameInput) roomNameInput.value = '';
             joinRoom(data.code || data.room_id);
+        } else {
+            alert(data.error || 'Erro ao criar sala');
         }
     } catch (e) {
         console.error(e);
@@ -272,6 +292,8 @@ async function joinRoom(roomIdent) {
                 state.roomStatus = data.status;
             }
 
+            state.myVote = (data.my_vote !== undefined && data.my_vote !== null) ? data.my_vote : null;
+
             if (data.players && Array.isArray(data.players) && data.players.length > 0) {
                 state.players = {};
                 data.players.forEach(p => {
@@ -281,12 +303,21 @@ async function joinRoom(roomIdent) {
                         value: p.value || null
                     };
                 });
-                if (state.players[state.userId] && state.players[state.userId].value) {
+                if (!state.myVote && state.players[state.userId] && state.players[state.userId].value) {
                     state.myVote = state.players[state.userId].value;
                 }
             } else {
                 // Registra a si mesmo localmente na interface
-                state.players[state.userId] = { name: state.userName, voted: false, value: null };
+                state.players[state.userId] = { 
+                    name: state.userName, 
+                    voted: !!state.myVote, 
+                    value: state.myVote 
+                };
+            }
+
+            if (state.myVote && state.players[state.userId]) {
+                state.players[state.userId].voted = true;
+                state.players[state.userId].value = state.myVote;
             }
 
             //if (roomsPollAbortController) roomsPollAbortController.abort();
@@ -450,7 +481,7 @@ function renderPlayers() {
         } else if (p.voted) {
             if (p.value) {
                 card.textContent = p.value;
-            } else if (parseInt(uid) === state.userId && state.myVote) {
+            } else if (parseInt(uid) === parseInt(state.userId) && state.myVote) {
                 card.textContent = state.myVote;
             } else {
                 card.textContent = '✓';
@@ -459,7 +490,7 @@ function renderPlayers() {
 
         const name = document.createElement('div');
         name.className = 'player-name';
-        name.textContent = p.name + (parseInt(uid) === state.userId ? ' (Você)' : '');
+        name.textContent = p.name + (parseInt(uid) === parseInt(state.userId) ? ' (Você)' : '');
 
         spot.appendChild(card);
         spot.appendChild(name);
@@ -497,8 +528,9 @@ function renderDeck() {
         wrapper.style.alignItems = 'center';
         wrapper.style.gap = '8px';
 
+        const isSelected = (state.myVote !== null && state.myVote !== undefined && String(state.myVote).trim() === String(val).trim());
         const btn = document.createElement('button');
-        btn.className = `vote-btn ${state.myVote === val ? 'selected' : ''}`;
+        btn.className = `vote-btn ${isSelected ? 'selected' : ''}`;
         btn.textContent = val;
 
         if (state.roomStatus === 'revealed') {
@@ -644,6 +676,10 @@ function handleEvent(event, isCatchingUp = false) {
                 state.players[data.user_id] = { name: `User ${data.user_id}`, voted: true, value: data.value || null };
                 renderPlayers();
             }
+            if (parseInt(data.user_id) === parseInt(state.userId) && data.value) {
+                state.myVote = data.value;
+                renderDeck();
+            }
             break;
 
         case 'reveal':
@@ -709,8 +745,61 @@ document.getElementById('btn-login').addEventListener('click', () => {
 document.getElementById('btn-back-rooms').addEventListener('click', leaveRoom);
 
 document.getElementById('btn-create-room').addEventListener('click', createRoom);
+
+const btnLogout = document.getElementById('btn-logout');
+if (btnLogout) {
+    btnLogout.addEventListener('click', logout);
+}
+
 btnReveal.addEventListener('click', revealVotes);
 btnReset.addEventListener('click', resetRoom);
 
+async function logout() {
+    try {
+        if (roomsPollXhr) {
+            roomsPollXhr.abort();
+            roomsPollXhr = null;
+        }
+        if (pollXhr) {
+            pollXhr.abort();
+            pollXhr = null;
+        }
+
+        await ajaxPost('../api/logout.php', {});
+    } catch (e) {
+        console.error('Erro ao deslogar:', e);
+    } finally {
+        state.userId = null;
+        state.userName = null;
+        state.roomId = null;
+        state.roomCode = null;
+        state.roomName = null;
+        state.lastEventId = 0;
+        state.players = {};
+        state.myVote = null;
+        state.roomStatus = 'voting';
+        window.INITIAL_SESSION = null;
+
+        window.history.pushState({}, '', window.location.pathname);
+
+        if (viewRoom) viewRoom.classList.add('hidden');
+        if (viewLogin) viewLogin.classList.remove('hidden');
+        if (dashboardView) dashboardView.classList.add('hidden');
+        if (loginForm) loginForm.classList.remove('hidden');
+
+        const welcomeMsg = document.getElementById('welcome-msg');
+        if (welcomeMsg) {
+            welcomeMsg.textContent = 'Estime tarefas com sua equipe em tempo real.';
+        }
+
+        const inputName = document.getElementById('input-name');
+        if (inputName) {
+            inputName.value = '';
+            inputName.focus();
+        }
+    }
+}
+
 // Boot
 init();
+

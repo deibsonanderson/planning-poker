@@ -43,9 +43,10 @@ session_start();
                 <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; text-align: center;">
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">Ou se preferir, crie uma nova sala para convidar sua equipe.</p>
                     <div class="form-group" style="text-align: left; margin-bottom: 1rem;">
-                        <input type="text" id="input-room-name" placeholder="Nome da Sala (Opcional)" autocomplete="off" onkeypress="if(event.key === 'Enter') document.getElementById('btn-create-room').click()">
+                        <input type="text" id="input-room-name" placeholder="Nome da Sala" autocomplete="off" onkeypress="if(event.key === 'Enter') document.getElementById('btn-create-room').click()">
                     </div>
-                    <button id="btn-create-room" class="secondary">Criar Nova Sala</button>
+                    <button id="btn-create-room">Criar Nova Sala</button>
+                    <button id="btn-logout" class="secondary" style="margin-top: 0.75rem;">Deslogar</button>
                 </div>
             </div>
         </div>
@@ -85,6 +86,13 @@ session_start();
     </div>
 
     <!-- JS -->
+    <script>
+        window.INITIAL_SESSION = <?php echo json_encode(
+            (isset($_SESSION['user_id']) && isset($_SESSION['user_name'])) 
+                ? ['user_id' => (int)$_SESSION['user_id'], 'name' => $_SESSION['user_name']] 
+                : null
+        ); ?>;
+    </script>
     <script src="js/app.js"></script>
 </body>
 </html>

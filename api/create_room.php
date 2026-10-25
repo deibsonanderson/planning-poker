@@ -9,8 +9,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$room_name = isset($_POST['name']) ? trim($_POST['name']) : 'Sala de ' . $_SESSION['user_name'];
-$room_name = mysqli_real_escape_string($conexao, $room_name);
+if (!isset($_POST['name']) || empty(trim($_POST['name']))) {
+    echo json_encode(['success' => false, 'error' => 'O nome da sala é obrigatório']);
+    exit;
+}
+
+$room_name = mysqli_real_escape_string($conexao, trim($_POST['name']));
 $user_id = (int) $_SESSION['user_id']; // Forçando cast para int para segurança
 
 // Gera o identificador único de 20 caracteres:

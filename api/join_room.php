@@ -47,21 +47,42 @@ if (mysqli_num_rows($res) === 0) {
 
 // Carrega os participantes e votos atuais para o estado inicial
 $users_in_room = [];
+$my_vote = null;
+
 $res_users = mysqli_query($conexao, "
     SELECT u.id, u.name, v.value as vote_val 
     FROM tb_poker_room_users ru 
-    JOIN tb_users u ON ru.user_id = u.id 
+    JOIN tb_poker_users u ON ru.user_id = u.id 
     LEFT JOIN tb_poker_votes v ON (v.room_id = $room_id AND v.user_id = u.id)
     WHERE ru.room_id = $room_id
 ");
 if ($res_users) {
     while ($u_row = mysqli_fetch_assoc($res_users)) {
+        $uid = (int)$u_row['id'];
+        $has_voted = !is_null($u_row['vote_val']);
+        $vote_value = null;
+
+        if ($uid === (int)$user_id) {
+            $my_vote = $u_row['vote_val'];
+            $vote_value = $u_row['vote_val'];
+        } else if ($room_status === 'revealed') {
+            $vote_value = $u_row['vote_val'];
+        }
+
         $users_in_room[] = [
-            'id' => (int)$u_row['id'],
+            'id' => $uid,
             'name' => $u_row['name'],
-            'voted' => !is_null($u_row['vote_val']),
-            'value' => ($room_status === 'revealed') ? $u_row['vote_val'] : null
+            'voted' => $has_voted,
+            'value' => $vote_value
         ];
+    }
+}
+
+// Fallback: se o usuário logado tiver voto mas não veio no loop acima
+if (is_null($my_vote)) {
+    $res_my_vote = mysqli_query($conexao, "SELECT value FROM tb_poker_votes WHERE room_id = $room_id AND user_id = $user_id LIMIT 1");
+    if ($res_my_vote && $row_vote = mysqli_fetch_assoc($res_my_vote)) {
+        $my_vote = $row_vote['value'];
     }
 }
 
@@ -71,6 +92,7 @@ echo json_encode([
     'room_code' => $room_code,
     'room_name' => $room_name,
     'status' => $room_status,
+    'my_vote' => $my_vote,
     'players' => $users_in_room
 ]);
 ?>
