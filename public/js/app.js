@@ -308,10 +308,10 @@ async function joinRoom(roomIdent) {
                 }
             } else {
                 // Registra a si mesmo localmente na interface
-                state.players[state.userId] = { 
-                    name: state.userName, 
-                    voted: !!state.myVote, 
-                    value: state.myVote 
+                state.players[state.userId] = {
+                    name: state.userName,
+                    voted: !!state.myVote,
+                    value: state.myVote
                 };
             }
 
@@ -472,12 +472,12 @@ function renderPlayers() {
         spot.style.left = `calc(50% + ${pos.x}px)`;
         spot.style.top = `calc(50% + ${pos.y}px)`;
 
-        const isWinner = (state.roomStatus === 'revealed' && winningValue !== null && p.value === winningValue);
+        const isWinner = (state.roomStatus === 'revealed' && winningValue !== null && p.value != '?' && p.value != '☕' && p.value === winningValue);
         const card = document.createElement('div');
         card.className = `player-card ${p.voted ? 'voted' : ''} ${state.roomStatus === 'revealed' ? 'revealed' : ''} ${isWinner ? 'winner' : ''}`;
 
         if (state.roomStatus === 'revealed' && p.value) {
-            card.textContent = p.value;
+            card.textContent = (p.value === '?' ? '☕' : p.value);
         } else if (p.voted) {
             if (p.value) {
                 card.textContent = p.value;
@@ -926,9 +926,9 @@ function playThrowAnimation(data) {
     const itemKey = data.item || 'tomato';
     const itemData = THROWABLE_ITEMS[itemKey] || THROWABLE_ITEMS.tomato;
 
-    const senderEl = document.querySelector(`.player-spot[data-user-id="${data.sender_id}"]`) || 
-                     document.querySelector('.deck-container') || 
-                     document.body;
+    const senderEl = document.querySelector(`.player-spot[data-user-id="${data.sender_id}"]`) ||
+        document.querySelector('.deck-container') ||
+        document.body;
     const targetEl = document.querySelector(`.player-spot[data-user-id="${data.target_id}"]`);
 
     if (!targetEl) return;
