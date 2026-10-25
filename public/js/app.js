@@ -490,7 +490,24 @@ function renderPlayers() {
 
         const name = document.createElement('div');
         name.className = 'player-name';
-        name.textContent = p.name + (parseInt(uid) === parseInt(state.userId) ? ' (Você)' : '');
+        const isMe = (parseInt(uid) === parseInt(state.userId));
+        name.textContent = (p.name || `User ${uid}`) + (isMe ? ' (Você)' : '');
+        spot.dataset.userId = uid;
+
+        if (!isMe) {
+            spot.classList.add('other-player');
+            spot.title = `Clique para arremessar algo em ${p.name}!`;
+
+            const hint = document.createElement('span');
+            hint.className = 'throw-hint';
+            hint.textContent = '🎯 Arremessar';
+            spot.appendChild(hint);
+
+            spot.onclick = (e) => {
+                e.stopPropagation();
+                openThrowMenu(uid, p.name, spot);
+            };
+        }
 
         spot.appendChild(card);
         spot.appendChild(name);
@@ -697,6 +714,14 @@ function handleEvent(event, isCatchingUp = false) {
             renderDeck();
             break;
 
+        case 'throw_item':
+            if (!isCatchingUp) {
+                if (parseInt(data.sender_id) !== parseInt(state.userId)) {
+                    playThrowAnimation(data);
+                }
+            }
+            break;
+
         case 'reset':
             state.roomStatus = 'voting';
             state.myVote = null;
@@ -713,6 +738,7 @@ function handleEvent(event, isCatchingUp = false) {
 }
 
 function leaveRoom() {
+    closeThrowMenu();
     if (pollXhr) {
         pollXhr.abort();
     }
@@ -734,6 +760,300 @@ function leaveRoom() {
     } else {
         loginForm.classList.remove('hidden');
     }
+}
+
+// --- Throw Objects Feature ---
+const THROWABLE_ITEMS = {
+    tomato: { emoji: '🍅', name: 'Tomate', splat: '🍅' },
+    egg: { emoji: '🥚', name: 'Ovo', splat: '🍳' },
+    airplane: { emoji: '✈️', name: 'Avião', splat: '💥' },
+    target: { emoji: '🎯', name: 'Alvo', splat: '🎯' },
+    heart: { emoji: '❤️', name: 'Coração', splat: '💖' },
+    coffee: { emoji: '☕', name: 'Café', splat: '☕' },
+    poop: { emoji: '💩', name: 'Cocô', splat: '💩' },
+    bomb: { emoji: '💣', name: 'Bomba', splat: '💥' }
+};
+
+let audioCtx = null;
+function playThrowSound(type) {
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+
+        const now = audioCtx.currentTime;
+
+        if (type === 'whoosh') {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(150, now + 0.3);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        } else if (type === 'splat') {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(180, now);
+            osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        } else if (type === 'boom') {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(120, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.4);
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.4);
+        } else if (type === 'pop') {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        }
+    } catch (e) {
+        // Silencioso se áudio não for permitido
+    }
+}
+
+let currentThrowMenu = null;
+
+function closeThrowMenu() {
+    if (currentThrowMenu) {
+        currentThrowMenu.remove();
+        currentThrowMenu = null;
+    }
+}
+
+document.addEventListener('click', (e) => {
+    if (currentThrowMenu && !currentThrowMenu.contains(e.target)) {
+        closeThrowMenu();
+    }
+});
+
+function openThrowMenu(targetUid, targetName, spotEl) {
+    closeThrowMenu();
+
+    const popover = document.createElement('div');
+    popover.className = 'throw-popover';
+
+    const rect = spotEl.getBoundingClientRect();
+    const isTopHalf = rect.top < 180;
+
+    popover.style.left = `${rect.left + rect.width / 2}px`;
+    if (isTopHalf) {
+        popover.classList.add('position-bottom');
+        popover.style.top = `${rect.bottom + 12}px`;
+    } else {
+        popover.style.top = `${rect.top - 12}px`;
+    }
+
+    const title = document.createElement('div');
+    title.className = 'throw-popover-title';
+    title.textContent = `Arremessar em ${targetName}`;
+    popover.appendChild(title);
+
+    const itemsContainer = document.createElement('div');
+    itemsContainer.className = 'throw-popover-items';
+
+    Object.keys(THROWABLE_ITEMS).forEach(itemKey => {
+        const item = THROWABLE_ITEMS[itemKey];
+        const btn = document.createElement('button');
+        btn.className = 'throw-item-btn';
+        btn.textContent = item.emoji;
+        btn.title = item.name;
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            closeThrowMenu();
+            throwItem(targetUid, itemKey, targetName);
+        };
+        itemsContainer.appendChild(btn);
+    });
+
+    popover.appendChild(itemsContainer);
+    document.body.appendChild(popover);
+    currentThrowMenu = popover;
+}
+
+async function throwItem(targetUid, itemKey, targetName) {
+    if (!state.roomId) return;
+
+    // Dispara animação imediatamente no remetente
+    playThrowAnimation({
+        sender_id: state.userId,
+        sender_name: state.userName,
+        target_id: targetUid,
+        target_name: targetName || 'Participante',
+        item: itemKey
+    });
+
+    try {
+        await ajaxPost('../api/throw_item.php', {
+            room_id: state.roomId,
+            target_id: targetUid,
+            item: itemKey
+        });
+    } catch (e) {
+        console.error('Erro ao registrar arremesso:', e);
+    }
+}
+
+function playThrowAnimation(data) {
+    const itemKey = data.item || 'tomato';
+    const itemData = THROWABLE_ITEMS[itemKey] || THROWABLE_ITEMS.tomato;
+
+    const senderEl = document.querySelector(`.player-spot[data-user-id="${data.sender_id}"]`) || 
+                     document.querySelector('.deck-container') || 
+                     document.body;
+    const targetEl = document.querySelector(`.player-spot[data-user-id="${data.target_id}"]`);
+
+    if (!targetEl) return;
+
+    const sRect = senderEl.getBoundingClientRect();
+    const tRect = targetEl.getBoundingClientRect();
+
+    const startX = sRect.left + sRect.width / 2;
+    const startY = sRect.top + sRect.height / 2;
+    const endX = tRect.left + tRect.width / 2;
+    const endY = tRect.top + tRect.height / 2;
+
+    const projectile = document.createElement('div');
+    projectile.className = 'throw-projectile';
+    projectile.textContent = itemData.emoji;
+    projectile.style.left = '0px';
+    projectile.style.top = '0px';
+    document.body.appendChild(projectile);
+
+    playThrowSound('whoosh');
+
+    const duration = 600;
+    const startTime = performance.now();
+    const distance = Math.hypot(endX - startX, endY - startY);
+    const arcHeight = Math.min(220, Math.max(80, distance * 0.35));
+
+    function step(now) {
+        const elapsed = now - startTime;
+        const p = Math.min(Math.max(elapsed / duration, 0), 1);
+
+        const currX = startX + (endX - startX) * p;
+        const arcY = -Math.sin(p * Math.PI) * arcHeight;
+        const currY = startY + (endY - startY) * p + arcY;
+
+        let transform = '';
+        if (itemKey === 'airplane') {
+            const dx = endX - startX;
+            const dy = (endY - startY) - Math.cos(p * Math.PI) * arcHeight;
+            const angle = (Math.atan2(dy, dx) * 180 / Math.PI) + 45;
+            transform = `translate(${currX}px, ${currY}px) translate(-50%, -50%) rotate(${angle}deg) scale(${1 + Math.sin(p * Math.PI) * 0.3})`;
+        } else {
+            const rotation = p * 720;
+            const scale = 1 + Math.sin(p * Math.PI) * 0.4;
+            transform = `translate(${currX}px, ${currY}px) translate(-50%, -50%) rotate(${rotation}deg) scale(${scale})`;
+        }
+
+        projectile.style.transform = transform;
+
+        if (p < 1) {
+            requestAnimationFrame(step);
+        } else {
+            projectile.remove();
+            triggerSplatImpact(targetEl, itemKey, itemData);
+            showThrowToast(data.sender_name, data.target_name, itemData);
+        }
+    }
+
+    requestAnimationFrame(step);
+}
+
+function triggerSplatImpact(targetSpot, itemKey, itemData) {
+    if (itemKey === 'bomb') {
+        playThrowSound('boom');
+    } else if (itemKey === 'heart' || itemKey === 'target') {
+        playThrowSound('pop');
+    } else {
+        playThrowSound('splat');
+    }
+
+    targetSpot.classList.remove('splat-shake');
+    void targetSpot.offsetWidth;
+    targetSpot.classList.add('splat-shake');
+    setTimeout(() => {
+        targetSpot.classList.remove('splat-shake');
+    }, 500);
+
+    const card = targetSpot.querySelector('.player-card') || targetSpot;
+    const splat = document.createElement('div');
+    splat.className = 'splat-overlay';
+
+    const badge = document.createElement('div');
+    badge.className = 'splat-badge';
+    badge.textContent = itemData.splat;
+    splat.appendChild(badge);
+
+    card.appendChild(splat);
+    setTimeout(() => {
+        splat.remove();
+    }, 2800);
+
+    if (itemKey === 'heart') {
+        for (let i = 0; i < 5; i++) {
+            const part = document.createElement('div');
+            part.className = 'splat-particle';
+            part.textContent = '💕';
+            part.style.setProperty('--tx', `${(Math.random() - 0.5) * 80}px`);
+            part.style.setProperty('--ty', `${-30 - Math.random() * 50}px`);
+            card.appendChild(part);
+            setTimeout(() => part.remove(), 800);
+        }
+    } else if (itemKey === 'bomb') {
+        for (let i = 0; i < 6; i++) {
+            const part = document.createElement('div');
+            part.className = 'splat-particle';
+            part.textContent = Math.random() > 0.5 ? '🔥' : '💨';
+            part.style.setProperty('--tx', `${(Math.random() - 0.5) * 100}px`);
+            part.style.setProperty('--ty', `${(Math.random() - 0.5) * 80}px`);
+            card.appendChild(part);
+            setTimeout(() => part.remove(), 800);
+        }
+    }
+}
+
+function showThrowToast(senderName, targetName, itemData) {
+    const container = document.getElementById('throw-toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'throw-toast';
+    toast.innerHTML = `<strong>${senderName}</strong> arremessou <strong>${itemData.name}</strong> em <strong>${targetName}</strong>! ${itemData.emoji}`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 2500);
 }
 
 // --- Event Listeners ---

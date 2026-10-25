@@ -14,7 +14,7 @@ session_start();
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- CSS -->
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=<?= filemtime(__DIR__ . '/css/style.css') ?>">
 </head>
 <body>
 
@@ -66,6 +66,8 @@ session_start();
             </div>
         </div>
 
+        <div id="throw-toast-container" class="throw-toast-container"></div>
+
         <div class="poker-table-wrapper animated">
             <div class="poker-table">
                 <!-- Centro da mesa -->
@@ -93,6 +95,6 @@ session_start();
                 : null
         ); ?>;
     </script>
-    <script src="js/app.js"></script>
+    <script src="js/app.js?v=<?= filemtime(__DIR__ . '/js/app.js') ?>"></script>
 </body>
 </html>
